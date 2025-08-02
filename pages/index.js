@@ -108,7 +108,7 @@ export default function Home() {
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-cyan-400 bg-clip-text text-transparent">
-              ⚔️ AzerothAH
+              ⚔️ Anniversary AH
             </h1>
             <p className="text-xl text-gray-300 mb-2">WoW Anniversary Realms - Auction House & Crafting Calculator</p>
             <p className="text-lg text-gray-400 italic mb-4">Created by goblins for goblins</p>
