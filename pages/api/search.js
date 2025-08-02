@@ -172,9 +172,10 @@ const sampleItems = {
 export default async function handler(req, res) {
   const { q: searchQuery, server: selectedServer, faction: selectedFaction, discover } = req.query;
   
-  // Special discovery mode to find Anniversary realms
+  // Special discovery mode to find Anniversary realms - CHECK THIS FIRST
   if (discover === 'true') {
     try {
+      console.log('🔍 Discovery mode activated - testing all 23 realm IDs...');
       const accessToken = await getBlizzardAccessToken();
       const foundRealms = await findAnniversaryRealms(accessToken);
       
@@ -182,16 +183,20 @@ export default async function handler(req, res) {
         success: true,
         message: `Found ${foundRealms.length} Anniversary realms`,
         foundRealms,
+        allTestedIds: ALL_POSSIBLE_REALM_IDS,
         timestamp: new Date().toISOString()
       });
     } catch (error) {
+      console.error('Discovery error:', error);
       return res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
+        stack: error.stack
       });
     }
   }
   
+  // Only require search query for normal searches, not discovery
   if (!searchQuery) {
     return res.status(400).json({ error: 'Search query required' });
   }
