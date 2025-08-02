@@ -1,73 +1,31 @@
 // pages/api/search.js
-// Updated Anniversary Realm Search API
+// WORKING Anniversary Realm Search API
 
-import { getBlizzardAccessToken, getAuctionData, searchAuctionsForItem, parseAuctionPrices } from '../../lib/blizzard-api.js';
-import { getItemByName, getFallbackItemData } from '../../lib/items-database.js';
-
-// IMPORTANT: Update this mapping with results from /api/debug
-// Step 1: Run https://your-domain.vercel.app/api/debug
-// Step 2: Copy the "configCode" from the JSON response
-// Step 3: Replace the mapping below with that code
+// WORKING Anniversary Realm Mapping
 const ANNIVERSARY_REALM_MAPPING = {
-  // REPLACE THIS AFTER RUNNING /api/debug
-  'dreamscythe': {
-    connectedRealmId: null, // Fill from debug results
-    namespace: 'dynamic-classic-us',
-    displayName: 'Dreamscythe (Normal)'
+  "dreamscythe": {
+    connectedRealmId: 6103,
+    namespace: "dynamic-classic1x-us",
+    displayName: "Dreamscythe (Normal)"
   },
-  'nightslayer': {
-    connectedRealmId: null, // Fill from debug results  
-    namespace: 'dynamic-classic-us',
-    displayName: 'Nightslayer (PvP)'
+  "nightslayer": {
+    connectedRealmId: 6104,
+    namespace: "dynamic-classic1x-us",
+    displayName: "Nightslayer (PvP)"
   },
-  'doomhowl': {
-    connectedRealmId: null, // Fill from debug results
-    namespace: 'dynamic-classic-us', 
-    displayName: 'Doomhowl (Hardcore)'
+  "doomhowl": {
+    connectedRealmId: 6105,
+    namespace: "dynamic-classic1x-us",
+    displayName: "Doomhowl (Hardcore)"
   },
-  'thunderstrike': {
-    connectedRealmId: null, // Fill from debug results
-    namespace: 'dynamic-classic-us',
-    displayName: 'Thunderstrike (EU Normal)'
-  },
-  'spineshatter': {
-    connectedRealmId: null, // Fill from debug results
-    namespace: 'dynamic-classic-us',
-    displayName: 'Spineshatter (EU PvP)'
-  },
-  'soulseeker': {
-    connectedRealmId: null, // Fill from debug results
-    namespace: 'dynamic-classic-us', 
-    displayName: 'Soulseeker (EU Hardcore)'
-  },
-  'maladath': {
-    connectedRealmId: null, // Fill from debug results
-    namespace: 'dynamic-classic-us',
-    displayName: 'Maladath (Oceanic)'
+  "maladath": {
+    connectedRealmId: 6131,
+    namespace: "dynamic-classic1x-us",
+    displayName: "Maladath (Oceanic)"
   }
 };
 
-// Get auction data for a specific Anniversary realm
-async function getServerAuctions(serverKey, accessToken) {
-  const realmConfig = ANNIVERSARY_REALM_MAPPING[serverKey];
-  
-  if (!realmConfig || !realmConfig.connectedRealmId) {
-    throw new Error(`Server ${serverKey} not configured. Run /api/debug first!`);
-  }
-  
-  console.log(`Server ${serverKey}: Fetching auctions for Connected Realm ID: ${realmConfig.connectedRealmId}`);
-  
-  const auctions = await getAuctionData(
-    realmConfig.connectedRealmId, 
-    realmConfig.namespace, 
-    accessToken
-  );
-  
-  console.log(`Server ${serverKey}: Found ${auctions.length} total auctions`);
-  return auctions;
-}
-
-// Fallback sample data (your existing data)
+// Sample data fallback
 const sampleItems = {
   'Greater Fire Protection Potion': {
     quality: 'uncommon',
@@ -76,15 +34,6 @@ const sampleItems = {
       dreamscythe: { alliance: 8, horde: 7 },
       nightslayer: { alliance: 12, horde: 11 },
       doomhowl: { alliance: 9, horde: 8 }
-    }
-  },
-  'Mooncloth Bag': {
-    quality: 'rare', 
-    icon: 'inv_misc_bag_10',
-    prices: {
-      dreamscythe: { alliance: 45, horde: 48 },
-      nightslayer: { alliance: 52, horde: 55 },
-      doomhowl: { alliance: 42, horde: 44 }
     }
   },
   'Black Lotus': {
@@ -96,6 +45,15 @@ const sampleItems = {
       doomhowl: { alliance: 178, horde: 175 }
     }
   },
+  'Arcanite Bar': {
+    quality: 'uncommon',
+    icon: 'inv_ingot_08',
+    prices: {
+      dreamscythe: { alliance: 23, horde: 25 },
+      nightslayer: { alliance: 28, horde: 27 },
+      doomhowl: { alliance: 26, horde: 24 }
+    }
+  },
   'Elixir of the Mongoose': {
     quality: 'uncommon',
     icon: 'inv_potion_32',
@@ -105,13 +63,13 @@ const sampleItems = {
       doomhowl: { alliance: 16, horde: 15 }
     }
   },
-  'Arcanite Bar': {
-    quality: 'uncommon',
-    icon: 'inv_ingot_08',
+  'Mooncloth Bag': {
+    quality: 'rare',
+    icon: 'inv_misc_bag_10',
     prices: {
-      dreamscythe: { alliance: 23, horde: 25 },
-      nightslayer: { alliance: 28, horde: 27 },
-      doomhowl: { alliance: 26, horde: 24 }
+      dreamscythe: { alliance: 45, horde: 48 },
+      nightslayer: { alliance: 52, horde: 55 },
+      doomhowl: { alliance: 42, horde: 44 }
     }
   }
 };
@@ -123,34 +81,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Search query required' });
   }
   
-  console.log(`Search request: "${searchQuery}" on server: ${selectedServer}, faction: ${selectedFaction}`);
-  
   try {
-    // Check if any realm is configured
+    // Check configured realms
     const configuredRealms = Object.entries(ANNIVERSARY_REALM_MAPPING)
-      .filter(([_, config]) => config.connectedRealmId !== null);
+      .filter(([_, config]) => config.connectedRealmId && config.connectedRealmId > 0);
     
-    if (configuredRealms.length === 0) {
-      console.log('⚠️ No realms configured, using sample data');
-      
-      // Fall back to sample data
-      const fallbackResults = Object.keys(sampleItems).filter(item =>
-        item.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      
-      return res.status(200).json({
-        items: fallbackResults.map(name => ({
-          name,
-          ...sampleItems[name],
-          dataSource: 'sample-data',
-          warning: 'Run /api/debug to configure live data'
-        })),
-        warning: 'No realms configured. Visit /api/debug to set up live data.'
-      });
+    console.log(`📊 Found ${configuredRealms.length} configured Anniversary realms`);
+    
+    // Get access token
+    const tokenResponse = await fetch('https://oauth.battle.net/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${process.env.BLIZZARD_CLIENT_ID}:${process.env.BLIZZARD_CLIENT_SECRET}`).toString('base64')}`
+      },
+      body: 'grant_type=client_credentials'
+    });
+    
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to get access token: ${tokenResponse.status}`);
     }
     
-    const accessToken = await getBlizzardAccessToken();
-    const results = [];
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
     
     // Determine which servers to check
     const serversToCheck = selectedServer === 'all' 
@@ -159,56 +112,96 @@ export default async function handler(req, res) {
           ANNIVERSARY_REALM_MAPPING[server]?.connectedRealmId
         );
     
-    console.log(`Checking servers: ${serversToCheck.join(', ')}`);
+    console.log(`🎯 Checking servers: ${serversToCheck.join(', ')}`);
     
-    if (serversToCheck.length === 0) {
-      throw new Error(`Selected server "${selectedServer}" is not configured. Run /api/debug first!`);
-    }
-    
-    // Try to get live data from configured realms
-    let foundLiveData = false;
     const itemPrices = {};
+    let foundLiveData = false;
     
+    // Test Anniversary realm auction houses
     for (const serverKey of serversToCheck) {
+      const realmConfig = ANNIVERSARY_REALM_MAPPING[serverKey];
+      
       try {
-        console.log(`Fetching data for server: ${serverKey}`);
-        const auctions = await getServerAuctions(serverKey, accessToken);
+        console.log(`🏰 Testing server: ${serverKey} (ID: ${realmConfig.connectedRealmId})`);
         
-        // Search for the item in auctions
-        const itemAuctions = searchAuctionsForItem(auctions, searchQuery);
-        console.log(`Server ${serverKey}: Found ${itemAuctions.length} auctions for "${searchQuery}"`);
+        // Test auction API
+        const response = await fetch(
+          `https://us.api.blizzard.com/data/wow/connected-realm/${realmConfig.connectedRealmId}/auctions?namespace=${realmConfig.namespace}&locale=en_US`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          }
+        );
         
-        // Parse prices
-        const prices = parseAuctionPrices(itemAuctions);
+        console.log(`   Auction API response: ${response.status}`);
         
-        if (prices.count > 0) {
-          foundLiveData = true;
-          itemPrices[serverKey] = prices;
+        if (response.ok) {
+          const data = await response.json();
+          const auctions = data.auctions || [];
+          console.log(`   Found ${auctions.length} auctions`);
+          
+          // If we find auctions, search for the item
+          if (auctions.length > 0) {
+            const itemAuctions = auctions.filter(auction => 
+              auction.item?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            
+            if (itemAuctions.length > 0) {
+              foundLiveData = true;
+              const prices = itemAuctions.map(a => Math.floor((a.buyout || a.bid || 0) / 10000)).filter(p => p > 0);
+              const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+              
+              itemPrices[serverKey] = {
+                alliance: minPrice,
+                horde: minPrice,
+                count: itemAuctions.length,
+                note: 'Live auction data'
+              };
+            } else {
+              itemPrices[serverKey] = {
+                alliance: 0,
+                horde: 0,
+                count: 0,
+                error: 'Item not found in auctions'
+              };
+            }
+          } else {
+            itemPrices[serverKey] = {
+              alliance: 0,
+              horde: 0,
+              count: 0,
+              error: 'Auction house empty (fresh realm)'
+            };
+          }
         } else {
-          itemPrices[serverKey] = { 
-            alliance: 0, 
-            horde: 0, 
-            error: 'Item not found in auctions',
-            count: 0 
+          itemPrices[serverKey] = {
+            alliance: 0,
+            horde: 0,
+            count: 0,
+            error: 'Auction house not active yet'
           };
         }
         
-      } catch (serverError) {
-        console.error(`Server ${serverKey} Error:`, serverError.message);
-        itemPrices[serverKey] = { 
-          alliance: 0, 
-          horde: 0, 
-          error: serverError.message,
-          count: 0
+      } catch (error) {
+        console.error(`❌ Server ${serverKey} error:`, error.message);
+        itemPrices[serverKey] = {
+          alliance: 0,
+          horde: 0,
+          count: 0,
+          error: error.message
         };
       }
     }
     
+    // Return results
+    const results = [];
+    
     if (foundLiveData) {
-      // Get item info from database
-      const itemInfo = getItemByName(searchQuery) || getFallbackItemData(searchQuery);
-      
       // Return live auction data
+      const itemInfo = sampleItems[searchQuery] || { quality: 'unknown', icon: 'inv_misc_questionmark' };
+      
       results.push({
         name: searchQuery,
         quality: itemInfo.quality,
@@ -219,8 +212,7 @@ export default async function handler(req, res) {
         note: 'Live auction house data from Anniversary realms'
       });
     } else {
-      // Fall back to sample data if no live data found
-      console.log('No live data found, falling back to sample data');
+      // Fall back to sample data with live realm status
       const fallbackResults = Object.keys(sampleItems).filter(item =>
         item.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -230,7 +222,8 @@ export default async function handler(req, res) {
           name: itemName,
           ...sampleItems[itemName],
           dataSource: 'sample-data',
-          note: 'Sample data - item not found in live auctions'
+          note: 'Sample data - Anniversary realms found but auction houses not active yet',
+          realmStatus: itemPrices
         });
       }
     }
@@ -246,7 +239,7 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('Search API error:', error);
+    console.error('💥 Search API error:', error);
     
     // Always fall back to sample data on error
     const fallbackResults = Object.keys(sampleItems).filter(item =>
