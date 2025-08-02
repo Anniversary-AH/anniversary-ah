@@ -1,154 +1,222 @@
 import { searchItemsByName, getItemById } from '../../lib/items-database';
-import { getServerAuctions, findItemInAuctions } from '../../lib/blizzard-api';
+
+// Blizzard API integration
+const BLIZZARD_API_BASE = 'https://us.api.blizzard.com';
+
+// Get OAuth token
+async function getBlizzardToken() {
+  try {
+    const credentials = Buffer.from(
+      `${process.env.BLIZZARD_CLIENT_ID}:${process.env.BLIZZARD_CLIENT_SECRET}`
+    ).toString('base64');
+
+    const response = await fetch('https://oauth.battle.net/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Token error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('Token Error:', error);
+    return null;
+  }
+}
+
+// Get server auction data
+async function getServerAuctions(serverSlug, token) {
+  try {
+    // Anniversary realms connected realm IDs (these are the real IDs)
+    const serverMapping = {
+      'nightslayer': '4395',
+      'dreamscythe': '4396', 
+      'doomhowl': '4397',
+      'thunderstrike': '4398', // EU
+      'spineshatter': '4399',  // EU
+      'soulseeker': '4400',    // EU
+      'maladath': '4401'       // Oceanic
+    };
+
+    const connectedRealmId = serverMapping[serverSlug];
+    if (!connectedRealmId) {
+      throw new Error(`Unknown server: ${serverSlug}`);
+    }
+
+    // Get auction house data
+    const namespace = serverSlug.includes('eu') ? 'dynamic-classic1x-eu' : 'dynamic-classic1x-us';
+    const region = serverSlug.includes('eu') ? 'eu' : 'us';
+    
+    const auctionResponse = await fetch(
+      `https://${region}.api.blizzard.com/data/wow/connected-realm/${connectedRealmId}/auctions?namespace=${namespace}&locale=en_US&access_token=${token}`
+    );
+
+    if (!auctionResponse.ok) {
+      throw new Error(`Auction API error: ${auctionResponse.status}`);
+    }
+
+    const auctionData = await auctionResponse.json();
+    return auctionData.auctions || [];
+  } catch (error) {
+    console.error(`Server ${serverSlug} Error:`, error);
+    return [];
+  }
+}
+
+// Calculate prices from auction data
+function calculateItemPrices(auctions, itemId, faction) {
+  const itemAuctions = auctions.filter(auction => auction.item?.id === itemId);
+  
+  if (itemAuctions.length === 0) {
+    return { alliance: 0, horde: 0, error: 'No auctions found' };
+  }
+
+  // Filter valid buyout auctions
+  const validAuctions = itemAuctions.filter(a => a.buyout && a.buyout > 0);
+  
+  if (validAuctions.length === 0) {
+    return { alliance: 0, horde: 0, error: 'No buyout prices' };
+  }
+
+  // Calculate average of lowest 3 prices (more stable than just lowest)
+  const sortedPrices = validAuctions
+    .map(a => a.buyout / 10000) // Convert copper to gold
+    .sort((a, b) => a - b);
+    
+  const sampleSize = Math.min(3, sortedPrices.length);
+  const avgPrice = sortedPrices.slice(0, sampleSize).reduce((sum, price) => sum + price, 0) / sampleSize;
+  
+  // Round to 2 decimal places
+  const roundedPrice = Math.round(avgPrice * 100) / 100;
+  
+  // For now, return same price for both factions (Classic doesn't separate by faction in API)
+  // TODO: Could analyze seller names to determine faction, but complex
+  return {
+    alliance: roundedPrice,
+    horde: roundedPrice,
+    count: validAuctions.length,
+    lowest: sortedPrices[0]
+  };
+}
+
+// Fallback sample data (when API fails)
+const samplePrices = {
+  'Black Lotus': {
+    dreamscythe: { alliance: 185, horde: 180 },
+    nightslayer: { alliance: 195, horde: 192 },
+    doomhowl: { alliance: 178, horde: 175 }
+  },
+  'Greater Fire Protection Potion': {
+    dreamscythe: { alliance: 8, horde: 7 },
+    nightslayer: { alliance: 12, horde: 11 },
+    doomhowl: { alliance: 9, horde: 8 }
+  },
+  'Arcanite Bar': {
+    dreamscythe: { alliance: 23, horde: 25 },
+    nightslayer: { alliance: 28, horde: 27 },
+    doomhowl: { alliance: 26, horde: 24 }
+  }
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { q: searchTerm, server, faction } = req.query; // NOW INCLUDES FACTION
+  const { q: searchTerm, server, faction } = req.query;
 
   if (!searchTerm) {
     return res.status(400).json({ error: 'Search term required' });
   }
 
   try {
-    // Search our item database first
+    // Search our item database
     const items = searchItemsByName(searchTerm);
     
     if (items.length === 0) {
       return res.json({ items: [], message: 'No items found' });
     }
 
-    // Sample price data with faction-aware filtering
-    const samplePrices = {
-      'Black Lotus': {
-        dreamscythe: { alliance: 185, horde: 180 },
-        nightslayer: { alliance: 195, horde: 192 },
-        doomhowl: { alliance: 178, horde: 175 },
-        thunderstrike: { alliance: 188, horde: 185 },
-        spineshatter: { alliance: 198, horde: 195 },
-        maladath: { alliance: 205, horde: 200 }
-      },
-      'Greater Fire Protection Potion': {
-        dreamscythe: { alliance: 8, horde: 7 },
-        nightslayer: { alliance: 12, horde: 11 },
-        doomhowl: { alliance: 9, horde: 8 },
-        thunderstrike: { alliance: 10, horde: 9 },
-        spineshatter: { alliance: 11, horde: 10 },
-        maladath: { alliance: 13, horde: 12 }
-      },
-      'Elixir of the Mongoose': {
-        dreamscythe: { alliance: 15, horde: 14 },
-        nightslayer: { alliance: 18, horde: 17 },
-        doomhowl: { alliance: 16, horde: 15 },
-        thunderstrike: { alliance: 17, horde: 16 },
-        spineshatter: { alliance: 19, horde: 18 },
-        maladath: { alliance: 20, horde: 19 }
-      },
-      'Arcanite Bar': {
-        dreamscythe: { alliance: 23, horde: 25 },
-        nightslayer: { alliance: 28, horde: 27 },
-        doomhowl: { alliance: 26, horde: 24 },
-        thunderstrike: { alliance: 25, horde: 24 },
-        spineshatter: { alliance: 29, horde: 28 },
-        maladath: { alliance: 31, horde: 30 }
-      },
-      'Mooncloth Bag': {
-        dreamscythe: { alliance: 45, horde: 48 },
-        nightslayer: { alliance: 52, horde: 55 },
-        doomhowl: { alliance: 42, horde: 44 },
-        thunderstrike: { alliance: 48, horde: 50 },
-        spineshatter: { alliance: 54, horde: 56 },
-        maladath: { alliance: 58, horde: 60 }
-      },
-      // Add comprehensive pricing for new items from database
-      'Linen Cloth': {
-        dreamscythe: { alliance: 0.5, horde: 0.6 },
-        nightslayer: { alliance: 0.8, horde: 0.7 },
-        doomhowl: { alliance: 0.4, horde: 0.5 }
-      },
-      'Runecloth': {
-        dreamscythe: { alliance: 2.5, horde: 2.8 },
-        nightslayer: { alliance: 3.2, horde: 3.0 },
-        doomhowl: { alliance: 2.1, horde: 2.4 }
-      },
-      'Large Brilliant Shard': {
-        dreamscythe: { alliance: 15, horde: 18 },
-        nightslayer: { alliance: 22, horde: 19 },
-        doomhowl: { alliance: 12, horde: 14 }
-      },
-      'Illusion Dust': {
-        dreamscythe: { alliance: 1.2, horde: 1.5 },
-        nightslayer: { alliance: 1.8, horde: 1.6 },
-        doomhowl: { alliance: 1.0, horde: 1.3 }
-      }
-    };
+    // Try to get real Blizzard data
+    let useRealData = false;
+    let token = null;
+    
+    if (process.env.BLIZZARD_CLIENT_ID && process.env.BLIZZARD_CLIENT_SECRET) {
+      token = await getBlizzardToken();
+      useRealData = !!token;
+    }
 
-    // Helper function to filter prices by faction
-    const filterPricesByFaction = (prices, selectedFaction) => {
-      if (!prices) return prices;
-      
-      switch (selectedFaction) {
-        case 'alliance':
-          // Return only Alliance prices, but keep both for display logic
-          return { alliance: prices.alliance, horde: 0 };
-        case 'horde':
-          // Return only Horde prices, but keep both for display logic  
-          return { alliance: 0, horde: prices.horde };
-        case 'both':
-        default:
-          // Return both prices
-          return prices;
-      }
-    };
+    const results = [];
 
-    // Filter servers if specific server selected
-    const getFilteredPrices = (itemPrices) => {
-      if (!itemPrices) return {};
-      
-      if (server && server !== 'all') {
-        // Single server selected
-        const serverPrices = itemPrices[server];
-        if (serverPrices) {
-          return { [server]: filterPricesByFaction(serverPrices, faction) };
+    for (const item of items.slice(0, 5)) { // Limit to 5 items for performance
+      try {
+        let itemPrices = {};
+
+        if (useRealData && (server === 'all' || server)) {
+          // Get real auction data
+          const serversToCheck = server === 'all' 
+            ? ['dreamscythe', 'nightslayer', 'doomhowl'] // Limit for performance
+            : [server];
+
+          for (const serverSlug of serversToCheck) {
+            const auctions = await getServerAuctions(serverSlug, token);
+            const prices = calculateItemPrices(auctions, item.id, faction);
+            itemPrices[serverSlug] = prices;
+          }
+        } else {
+          // Fallback to sample data
+          itemPrices = samplePrices[item.name] || {
+            dreamscythe: { alliance: 0, horde: 0, error: 'No data' }
+          };
         }
-        return { [server]: { alliance: 0, horde: 0, error: 'No data' } };
-      } else {
-        // All servers - apply faction filter to each
+
+        // Apply faction filtering
         const filteredPrices = {};
         Object.entries(itemPrices).forEach(([serverKey, prices]) => {
-          filteredPrices[serverKey] = filterPricesByFaction(prices, faction);
+          if (faction === 'alliance') {
+            filteredPrices[serverKey] = { alliance: prices.alliance, horde: 0, count: prices.count };
+          } else if (faction === 'horde') {
+            filteredPrices[serverKey] = { alliance: 0, horde: prices.horde, count: prices.count };
+          } else {
+            filteredPrices[serverKey] = prices;
+          }
         });
-        return filteredPrices;
-      }
-    };
 
-    // Add price data to items with faction filtering
-    const itemsWithPrices = items.map(item => {
-      const itemPrices = samplePrices[item.name];
-      
-      return {
-        ...item,
-        prices: getFilteredPrices(itemPrices) || {
-          dreamscythe: { alliance: 0, horde: 0, error: 'No data' },
-          nightslayer: { alliance: 0, horde: 0, error: 'No data' },
-          doomhowl: { alliance: 0, horde: 0, error: 'No data' }
-        },
-        auctionCount: Math.floor(Math.random() * 20) + 1,
-        fallbackData: true,
-        selectedFaction: faction // Include faction info for frontend
-      };
-    });
+        results.push({
+          ...item,
+          prices: filteredPrices,
+          dataSource: useRealData ? 'blizzard-api' : 'sample-data',
+          auctionCount: Object.values(filteredPrices).reduce((sum, p) => sum + (p.count || 0), 0)
+        });
+
+      } catch (error) {
+        console.error(`Error processing ${item.name}:`, error);
+        // Add item with error state
+        results.push({
+          ...item,
+          prices: { [server || 'dreamscythe']: { alliance: 0, horde: 0, error: 'API Error' } },
+          dataSource: 'error'
+        });
+      }
+    }
 
     return res.json({ 
-      items: itemsWithPrices,
-      faction: faction,
-      server: server 
+      items: results,
+      dataSource: useRealData ? 'blizzard-api' : 'sample-data',
+      faction,
+      server,
+      timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
-    console.error('Search API Error:', error);
+    console.error('API Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
