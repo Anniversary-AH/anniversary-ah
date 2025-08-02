@@ -111,7 +111,7 @@ export default function Home() {
               ⚔️ Anniversary AH
             </h1>
             <p className="text-xl text-gray-300 mb-2">WoW Anniversary Realms - Auction House & Crafting Calculator</p>
-            <p className="text-lg text-gray-400 italic mb-4">Created by goblins for goblins</p>
+            <p className="text-lg text-gray-400 italic mb-4">Created by goblins, for goblins</p>
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-center">
               <span className="text-yellow-400 font-bold">🆕 Anniversary Realms</span>
               <span className="text-cyan-400 mx-4">Currently: Classic</span>
