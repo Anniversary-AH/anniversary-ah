@@ -2,10 +2,8 @@
 // Anniversary Realm Discovery API
 
 export default async function handler(req, res) {
-  const BLIZZARD_API_BASE = 'https://us.api.blizzard.com';
-  
   try {
-    console.log('🔍 Starting Anniversary Realm Discovery...');
+    console.log('🔍 Starting Enhanced Anniversary Realm Discovery...');
     
     // Get access token
     const tokenResponse = await fetch('https://oauth.battle.net/token', {
@@ -18,7 +16,8 @@ export default async function handler(req, res) {
     });
     
     if (!tokenResponse.ok) {
-      throw new Error(`Token request failed: ${tokenResponse.status}`);
+      const errorDetails = await tokenResponse.text();
+      throw new Error(`Token request failed: ${tokenResponse.status} - ${errorDetails}`);
     }
     
     const tokenData = await tokenResponse.json();
@@ -34,148 +33,221 @@ export default async function handler(req, res) {
     
     const results = {
       timestamp: new Date().toISOString(),
-      searchedNamespaces: [],
+      apiCredentialsValid: true,
+      searchedEndpoints: [],
       foundRealms: {},
       allRealms: {},
       errors: [],
       configCode: ''
     };
     
-    // Try different namespaces where Anniversary realms might be
-    const namespacesToTry = [
-      'dynamic-classic-us',    // Most likely for Anniversary
-      'static-classic-us',     // Classic Era
-      'dynamic-us',            // Regular WoW dynamic
-      'static-us',             // Regular WoW static
-      'dynamic-classic-eu',    // EU Classic
-      'static-classic-eu'      // EU Classic static
+    // Try multiple API endpoints and namespaces
+    const endpointsToTry = [
+      // US endpoints with different namespaces
+      { region: 'us', base: 'https://us.api.blizzard.com', namespaces: [
+        'dynamic-classic-us', 'static-classic-us', 'dynamic-us', 'static-us',
+        'dynamic-classic-1x-us', 'dynamic-anniversary-us', 'dynamic-fresh-us',
+        'static-anniversary-us', 'profile-classic-us', 'dynamic-hardcore-us'
+      ]},
+      // EU endpoints  
+      { region: 'eu', base: 'https://eu.api.blizzard.com', namespaces: [
+        'dynamic-classic-eu', 'static-classic-eu', 'dynamic-eu', 'static-eu',
+        'dynamic-classic-1x-eu', 'dynamic-anniversary-eu', 'dynamic-fresh-eu'
+      ]},
+      // Try Korean/Taiwan (sometimes realms appear here first)
+      { region: 'kr', base: 'https://kr.api.blizzard.com', namespaces: [
+        'dynamic-classic-kr', 'static-classic-kr'
+      ]}
     ];
     
-    for (const namespace of namespacesToTry) {
-      try {
-        console.log(`🔍 Checking namespace: ${namespace}`);
-        results.searchedNamespaces.push(namespace);
-        
-        // Get realm index
-        const realmResponse = await fetch(
-          `${BLIZZARD_API_BASE}/data/wow/realm/index?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
-        );
-        
-        if (!realmResponse.ok) {
-          results.errors.push(`Realm index failed for ${namespace}: ${realmResponse.status}`);
-          continue;
-        }
-        
-        const realmData = await realmResponse.json();
-        const realms = realmData.realms || [];
-        
-        console.log(`Found ${realms.length} realms in ${namespace}`);
-        
-        // Store all realms for debugging
-        results.allRealms[namespace] = realms.map(r => ({
-          id: r.id,
-          name: r.name,
-          slug: r.slug,
-          category: r.category?.name || 'unknown'
-        }));
-        
-        // Search for Anniversary realms
-        for (const realm of realms) {
-          const realmName = realm.name.toLowerCase();
-          const realmSlug = realm.slug?.toLowerCase() || '';
+    for (const endpoint of endpointsToTry) {
+      for (const namespace of endpoint.namespaces) {
+        try {
+          console.log(`🔍 Checking ${endpoint.region} - ${namespace}`);
+          const searchKey = `${endpoint.region}:${namespace}`;
+          results.searchedEndpoints.push(searchKey);
           
-          const isAnniversary = anniversaryKeywords.some(keyword => 
-            realmName.includes(keyword) || realmSlug.includes(keyword)
+          // Get realm index
+          const realmResponse = await fetch(
+            `${endpoint.base}/data/wow/realm/index?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
           );
           
-          if (isAnniversary) {
-            console.log(`✨ Found Anniversary realm: ${realm.name} (ID: ${realm.id})`);
+          if (!realmResponse.ok) {
+            results.errors.push(`${searchKey} realm index failed: ${realmResponse.status}`);
             
-            // Get connected realm info
-            try {
-              const connectedRealmResponse = await fetch(
-                `${BLIZZARD_API_BASE}/data/wow/connected-realm/index?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
+            // Try alternative endpoint structures for Anniversary realms
+            if (realmResponse.status === 404) {
+              console.log(`Trying alternative structures for ${searchKey}...`);
+              
+              // Try connected realm endpoint directly
+              const connectedResponse = await fetch(
+                `${endpoint.base}/data/wow/connected-realm/index?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
               );
               
-              if (connectedRealmResponse.ok) {
-                const connectedData = await connectedRealmResponse.json();
+              if (connectedResponse.ok) {
+                console.log(`✅ Connected realm endpoint works for ${searchKey}`);
+                const connectedData = await connectedResponse.json();
                 
-                // Find which connected realm this realm belongs to
-                let connectedRealmId = null;
-                
-                for (const connectedRealm of connectedData.connected_realms || []) {
+                // Try to get realm details from connected realms
+                for (const connectedRealm of (connectedData.connected_realms || []).slice(0, 5)) {
                   try {
-                    const connectedDetailResponse = await fetch(
-                      `${BLIZZARD_API_BASE}${connectedRealm.href}?access_token=${accessToken}`
+                    const detailResponse = await fetch(
+                      `${endpoint.base}${connectedRealm.href}?access_token=${accessToken}`
                     );
                     
-                    if (connectedDetailResponse.ok) {
-                      const connectedDetail = await connectedDetailResponse.json();
+                    if (detailResponse.ok) {
+                      const detailData = await detailResponse.json();
                       
-                      const belongsToConnected = connectedDetail.realms?.some(r => 
-                        r.id === realm.id || r.slug === realm.slug
-                      );
-                      
-                      if (belongsToConnected) {
-                        connectedRealmId = connectedDetail.id;
+                      // Check if any realms in this connected realm are Anniversary realms
+                      for (const realm of detailData.realms || []) {
+                        const realmName = realm.name.toLowerCase();
+                        const realmSlug = realm.slug?.toLowerCase() || '';
                         
-                        // Test auction access
-                        const auctionResponse = await fetch(
-                          `${BLIZZARD_API_BASE}/data/wow/connected-realm/${connectedDetail.id}/auctions?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
+                        const isAnniversary = anniversaryKeywords.some(keyword => 
+                          realmName.includes(keyword) || realmSlug.includes(keyword)
                         );
                         
-                        const auctionCount = auctionResponse.ok ? 
-                          (await auctionResponse.json()).auctions?.length || 0 : 0;
-                        
-                        results.foundRealms[realm.slug || realmName] = {
-                          realmId: realm.id,
-                          realmName: realm.name,
-                          realmSlug: realm.slug,
-                          connectedRealmId: connectedDetail.id,
-                          namespace: namespace,
-                          auctionWorking: auctionResponse.ok,
-                          auctionStatus: auctionResponse.status,
-                          auctionCount: auctionCount,
-                          auctionEndpoint: `/data/wow/connected-realm/${connectedDetail.id}/auctions`
-                        };
-                        
-                        console.log(`🏪 Auction test for ${realm.name}: ${auctionResponse.status} (${auctionCount} auctions)`);
-                        break;
+                        if (isAnniversary) {
+                          console.log(`🎉 Found Anniversary realm via connected realm: ${realm.name}`);
+                          
+                          // Test auction access
+                          const auctionResponse = await fetch(
+                            `${endpoint.base}/data/wow/connected-realm/${detailData.id}/auctions?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
+                          );
+                          
+                          const auctionCount = auctionResponse.ok ? 
+                            (await auctionResponse.json()).auctions?.length || 0 : 0;
+                          
+                          results.foundRealms[realm.slug || realmName] = {
+                            realmId: realm.id,
+                            realmName: realm.name,
+                            realmSlug: realm.slug,
+                            connectedRealmId: detailData.id,
+                            namespace: namespace,
+                            region: endpoint.region,
+                            apiBase: endpoint.base,
+                            auctionWorking: auctionResponse.ok,
+                            auctionStatus: auctionResponse.status,
+                            auctionCount: auctionCount,
+                            discoveryMethod: 'connected-realm-search'
+                          };
+                        }
                       }
                     }
                   } catch (innerError) {
-                    console.log(`Inner error for connected realm lookup: ${innerError.message}`);
+                    // Continue to next connected realm
                   }
                 }
-                
-                if (!connectedRealmId) {
-                  // Still add the realm info even if connected realm lookup fails
-                  results.foundRealms[realm.slug || realmName] = {
-                    realmId: realm.id,
-                    realmName: realm.name,
-                    realmSlug: realm.slug,
-                    namespace: namespace,
-                    error: 'Could not find connected realm ID'
-                  };
-                }
               }
-            } catch (connectedError) {
-              console.log(`❌ Connected realm error for ${realm.name}:`, connectedError.message);
+            }
+            continue;
+          }
+          
+          const realmData = await realmResponse.json();
+          const realms = realmData.realms || [];
+          
+          console.log(`Found ${realms.length} realms in ${searchKey}`);
+          
+          // Store all realms for debugging
+          if (!results.allRealms[searchKey]) {
+            results.allRealms[searchKey] = [];
+          }
+          results.allRealms[searchKey] = realms.map(r => ({
+            id: r.id,
+            name: r.name,
+            slug: r.slug,
+            category: r.category?.name || 'unknown'
+          }));
+          
+          // Search for Anniversary realms in this namespace
+          for (const realm of realms) {
+            const realmName = realm.name.toLowerCase();
+            const realmSlug = realm.slug?.toLowerCase() || '';
+            
+            const isAnniversary = anniversaryKeywords.some(keyword => 
+              realmName.includes(keyword) || realmSlug.includes(keyword)
+            );
+            
+            if (isAnniversary) {
+              console.log(`✨ Found Anniversary realm: ${realm.name} (ID: ${realm.id})`);
               
-              results.foundRealms[realm.slug || realmName] = {
-                realmId: realm.id,
-                realmName: realm.name,
-                realmSlug: realm.slug,
-                namespace: namespace,
-                error: `Connected realm lookup failed: ${connectedError.message}`
-              };
+              // Get connected realm info using standard method
+              try {
+                const connectedRealmResponse = await fetch(
+                  `${endpoint.base}/data/wow/connected-realm/index?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
+                );
+                
+                if (connectedRealmResponse.ok) {
+                  const connectedData = await connectedRealmResponse.json();
+                  
+                  // Find which connected realm this realm belongs to
+                  for (const connectedRealm of connectedData.connected_realms || []) {
+                    try {
+                      const connectedDetailResponse = await fetch(
+                        `${endpoint.base}${connectedRealm.href}?access_token=${accessToken}`
+                      );
+                      
+                      if (connectedDetailResponse.ok) {
+                        const connectedDetail = await connectedDetailResponse.json();
+                        
+                        const belongsToConnected = connectedDetail.realms?.some(r => 
+                          r.id === realm.id || r.slug === realm.slug
+                        );
+                        
+                        if (belongsToConnected) {
+                          // Test auction access
+                          const auctionResponse = await fetch(
+                            `${endpoint.base}/data/wow/connected-realm/${connectedDetail.id}/auctions?namespace=${namespace}&locale=en_US&access_token=${accessToken}`
+                          );
+                          
+                          const auctionCount = auctionResponse.ok ? 
+                            (await auctionResponse.json()).auctions?.length || 0 : 0;
+                          
+                          results.foundRealms[realm.slug || realmName] = {
+                            realmId: realm.id,
+                            realmName: realm.name,
+                            realmSlug: realm.slug,
+                            connectedRealmId: connectedDetail.id,
+                            namespace: namespace,
+                            region: endpoint.region,
+                            apiBase: endpoint.base,
+                            auctionWorking: auctionResponse.ok,
+                            auctionStatus: auctionResponse.status,
+                            auctionCount: auctionCount,
+                            discoveryMethod: 'standard-realm-search'
+                          };
+                          
+                          console.log(`🏪 Auction test for ${realm.name}: ${auctionResponse.status} (${auctionCount} auctions)`);
+                          break;
+                        }
+                      }
+                    } catch (innerError) {
+                      console.log(`Inner error: ${innerError.message}`);
+                    }
+                  }
+                }
+              } catch (connectedError) {
+                console.log(`❌ Connected realm error for ${realm.name}:`, connectedError.message);
+                
+                // Still record the realm even if we can't get connected realm info
+                results.foundRealms[realm.slug || realmName] = {
+                  realmId: realm.id,
+                  realmName: realm.name,
+                  realmSlug: realm.slug,
+                  namespace: namespace,
+                  region: endpoint.region,
+                  apiBase: endpoint.base,
+                  error: `Connected realm lookup failed: ${connectedError.message}`,
+                  discoveryMethod: 'realm-only'
+                };
+              }
             }
           }
+          
+        } catch (namespaceError) {
+          console.log(`❌ Error with ${searchKey}:`, namespaceError.message);
+          results.errors.push(`${searchKey} failed: ${namespaceError.message}`);
         }
-        
-      } catch (namespaceError) {
-        console.log(`❌ Namespace error for ${namespace}:`, namespaceError.message);
-        results.errors.push(`Namespace ${namespace} failed: ${namespaceError.message}`);
       }
     }
     
@@ -197,6 +269,8 @@ export default async function handler(req, res) {
           configMapping[slug] = {
             connectedRealmId: realm.connectedRealmId,
             namespace: realm.namespace,
+            region: realm.region,
+            apiBase: realm.apiBase,
             displayName: displayNames[slug] || realm.realmName
           };
         }
@@ -204,13 +278,37 @@ export default async function handler(req, res) {
       
       results.configCode = `// Add this to your search.js file:
 const ANNIVERSARY_REALM_MAPPING = ${JSON.stringify(configMapping, null, 2)};`;
+    } else {
+      // If no Anniversary realms found, provide debugging info
+      const workingEndpoints = Object.keys(results.allRealms).filter(key => 
+        results.allRealms[key].length > 0
+      );
+      
+      results.debugInfo = {
+        workingEndpoints,
+        totalSearched: results.searchedEndpoints.length,
+        possibleReasons: [
+          'Anniversary realms might use different names than expected',
+          'Anniversary realms might be in a different API structure',
+          'Anniversary realms might not be available in the API yet',
+          'API endpoints might have changed since Anniversary launch'
+        ],
+        suggestions: [
+          'Check all realm names in working endpoints for Anniversary-like names',
+          'Look for realms with recent creation dates',
+          'Check if Anniversary realms are in profile APIs instead of game data APIs',
+          'Try manual realm ID lookup if you know specific realm IDs'
+        ]
+      };
     }
     
-    console.log(`✅ Discovery complete. Found ${Object.keys(results.foundRealms).length} Anniversary realms`);
+    console.log(`✅ Enhanced discovery complete. Found ${Object.keys(results.foundRealms).length} Anniversary realms`);
     
     res.status(200).json({
-      success: true,
-      message: `Found ${Object.keys(results.foundRealms).length} Anniversary realms`,
+      success: Object.keys(results.foundRealms).length > 0,
+      message: Object.keys(results.foundRealms).length > 0 ? 
+        `Found ${Object.keys(results.foundRealms).length} Anniversary realms` :
+        'No Anniversary realms found - see debugInfo for next steps',
       ...results
     });
     
