@@ -46,6 +46,24 @@ export default function Home() {
         nightslayer: { alliance: 195, horde: 192 },
         doomhowl: { alliance: 178, horde: 175 }
       }
+    },
+    'Elixir of the Mongoose': {
+      quality: 'uncommon',
+      icon: 'inv_potion_32',
+      prices: {
+        dreamscythe: { alliance: 15, horde: 14 },
+        nightslayer: { alliance: 18, horde: 17 },
+        doomhowl: { alliance: 16, horde: 15 }
+      }
+    },
+    'Arcanite Bar': {
+      quality: 'uncommon',
+      icon: 'inv_ingot_08',
+      prices: {
+        dreamscythe: { alliance: 23, horde: 25 },
+        nightslayer: { alliance: 28, horde: 27 },
+        doomhowl: { alliance: 26, horde: 24 }
+      }
     }
   };
 
@@ -92,8 +110,8 @@ export default function Home() {
             <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-cyan-400 bg-clip-text text-transparent">
               ⚔️ AzerothAH
             </h1>
-        <p className="text-xl text-gray-300 mb-2">WoW Anniversary Realms - Auction House & Crafting Calculator</p>
-        <p className="text-lg text-gray-400 italic mb-4">Created by goblins for goblins</p>
+            <p className="text-xl text-gray-300 mb-2">WoW Anniversary Realms - Auction House & Crafting Calculator</p>
+            <p className="text-lg text-gray-400 italic mb-4">Created by goblins for goblins</p>
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-center">
               <span className="text-yellow-400 font-bold">🆕 Anniversary Realms</span>
               <span className="text-cyan-400 mx-4">Currently: Classic</span>
@@ -105,7 +123,7 @@ export default function Home() {
           <div className="flex flex-wrap gap-2 mb-8 bg-white/10 p-2 rounded-2xl backdrop-blur-md">
             {[
               { id: 'prices', label: '📊 Price Tracker', desc: 'Track prices across all Anniversary realms' },
-              { id: 'crafting', label: '⚒️ Crafting Calculator', desc: 'Calculate crafting profits' },
+              { id: 'crafting', label: '⚒️ Crafting Calculator', desc: 'Coming Soon!' },
               { id: 'watchlist', label: '⭐ Watchlist', desc: 'Track your favorite items' }
             ].map((tab) => (
               <button
@@ -133,13 +151,13 @@ export default function Home() {
                 {/* Quick Items */}
                 <div className="flex flex-wrap gap-2 mb-4">
                   <span className="text-gray-400 mr-4">Anniversary Essentials:</span>
-                  {['Greater Fire Protection Potion', 'Mooncloth Bag', 'Black Lotus'].map((item) => (
+                  {['Greater Fire Protection Potion', 'Mooncloth Bag', 'Black Lotus', 'Elixir of the Mongoose', 'Arcanite Bar'].map((item) => (
                     <button
                       key={item}
                       onClick={() => quickSearch(item)}
                       className="px-3 py-1 bg-yellow-400/20 text-yellow-400 border border-yellow-400 rounded-full text-sm hover:bg-yellow-400 hover:text-slate-900 transition-all"
                     >
-                      {item.replace(' Protection', '').replace(' Potion', '')}
+                      {item.replace(' Protection', '').replace(' Potion', '').replace(' of the', '')}
                     </button>
                   ))}
                 </div>
@@ -229,95 +247,26 @@ export default function Home() {
             </div>
           )}
 
-          {/* Crafting Calculator Tab */}
+          {/* Crafting Calculator Tab - Coming Soon */}
           {currentTab === 'crafting' && (
             <div className="bg-white/5 border border-white/20 rounded-2xl p-6 backdrop-blur-md">
               <h3 className="text-yellow-400 text-xl font-bold mb-4">⚒️ Crafting Profit Calculator</h3>
               
-              {/* Premium Banner */}
-              <div className="bg-gradient-to-r from-yellow-400/10 to-orange-500/10 border-2 border-yellow-400/30 rounded-xl p-6 mb-6 text-center">
-                <h4 className="text-yellow-400 text-lg font-bold mb-2">🚀 Unlock Anniversary Realm Mastery</h4>
-                <p className="mb-4 text-gray-300">Dominate the fresh economy! Save unlimited Classic recipes, get TBC-ready alerts!</p>
-                <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-slate-900 px-6 py-3 rounded-lg font-bold hover:shadow-lg transition-all">
-                  Upgrade to Premium - $12.99/month
-                </button>
-                <p className="text-sm text-gray-400 mt-2">Free users can save 2 patterns. You have <strong>1 remaining</strong>.</p>
-              </div>
-
-              {/* Sample Crafting Pattern */}
-              <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-500/50 rounded-xl p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-600 rounded-lg border-2 border-yellow-400 flex items-center justify-center text-2xl">
-                      👜
-                    </div>
-                    <div>
-                      <h4 className="text-yellow-400 text-lg font-bold">Mooncloth Bag</h4>
-                      <span className="bg-amber-700 text-white px-2 py-1 rounded text-xs font-bold">TAILORING (300)</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-cyan-400 text-2xl font-bold">+15.4g</div>
-                    <div className="text-gray-400 text-sm">42% margin</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                  <div>
-                    <h5 className="text-yellow-400 font-bold mb-2">📦 Materials Cost</h5>
-                    <div className="bg-black/20 p-4 rounded-lg space-y-2">
-                      <div className="flex justify-between">
-                        <span>2x Mooncloth</span>
-                        <span className="text-red-400 font-bold">28.0g</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>2x Heavy Silken Thread</span>
-                        <span className="text-red-400 font-bold">1.6g</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>2x Ironweb Spider Silk</span>
-                        <span className="text-red-400 font-bold">7.0g</span>
-                      </div>
-                      <div className="border-t border-white/20 pt-2">
-                        <div className="flex justify-between font-bold text-yellow-400">
-                          <span>Total:</span>
-                          <span>36.6g</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h5 className="text-yellow-400 font-bold mb-2">💰 Selling Price</h5>
-                    <div className="space-y-2">
-                      <div className="bg-yellow-400/10 border border-yellow-400/30 p-3 rounded-lg flex justify-between items-center">
-                        <div className="text-cyan-400 font-bold">Nightslayer (PvP)</div>
-                        <div>
-                          <div className="text-cyan-400 font-bold text-lg">52.0g</div>
-                          <div className="text-cyan-400 text-sm">+15.4g profit</div>
-                        </div>
-                      </div>
-                      <div className="bg-cyan-500/10 border border-cyan-500/30 p-3 rounded-lg flex justify-between items-center">
-                        <div className="text-cyan-400 font-bold">Maladath (Oceanic)</div>
-                        <div>
-                          <div className="text-cyan-400 font-bold text-lg">58.0g</div>
-                          <div className="text-cyan-400 text-sm">+21.4g profit ⭐</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-gray-300 hover:border-yellow-400 hover:text-yellow-400 transition-all">
-                    📋 Shopping List
-                  </button>
-                  <button className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-gray-300 hover:border-yellow-400 hover:text-yellow-400 transition-all">
-                    🔔 Profit Alert
-                  </button>
-                  <button className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-gray-300 hover:border-yellow-400 hover:text-yellow-400 transition-all">
-                    🌐 Cross-Server
-                  </button>
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">🚧</div>
+                <h4 className="text-2xl text-yellow-400 font-bold mb-2">Coming Soon!</h4>
+                <p className="text-gray-300 mb-4">We're building the ultimate crafting profit calculator for Anniversary realms!</p>
+                <p className="text-gray-400 mb-4">Features will include:</p>
+                <ul className="text-gray-400 mt-2 space-y-1 max-w-md mx-auto text-left">
+                  <li>• Real-time profit calculations</li>
+                  <li>• Cross-realm arbitrage opportunities</li>
+                  <li>• Classic recipe database</li>
+                  <li>• TBC preparation tools</li>
+                  <li>• Guild shopping lists</li>
+                  <li>• Price alerts & notifications</li>
+                </ul>
+                <div className="mt-6 p-4 bg-yellow-400/10 border border-yellow-400/30 rounded-lg">
+                  <p className="text-yellow-400 font-bold">Built by goblins for goblins!</p>
                 </div>
               </div>
             </div>
