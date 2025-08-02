@@ -303,20 +303,29 @@ export default function Home() {
                           <div className="flex justify-between items-center mb-4">
                             <div>
                               <h4 className="text-yellow-400 text-lg font-bold">{itemName}</h4>
-                              <div className="flex items-center gap-2">
-                                <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${
-                                  itemData.quality === 'epic' ? 'bg-purple-600' :
-                                  itemData.quality === 'rare' ? 'bg-blue-600' : 'bg-green-600'
-                                }`}>
-                                  {itemData.quality}
-                                </span>
-                                {item.fallbackData && (
-                                  <span className="text-xs text-gray-500">(Sample Data)</span>
-                                )}
-                                {item.auctionCount !== undefined && (
-                                  <span className="text-xs text-cyan-400">({item.auctionCount} auctions)</span>
-                                )}
-                              </div>
+                          <div className="flex items-center gap-2">
+  <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${
+    itemData.quality === 'epic' ? 'bg-purple-600' :
+    itemData.quality === 'rare' ? 'bg-blue-600' : 'bg-green-600'
+  }`}>
+    {itemData.quality}
+  </span>
+  {item.dataSource && (
+    <span className={`text-xs px-2 py-1 rounded ${
+      item.dataSource === 'blizzard-api' 
+        ? 'bg-green-600 text-white' 
+        : 'bg-gray-600 text-gray-300'
+    }`}>
+      {item.dataSource === 'blizzard-api' ? 'Live Data' : 'Sample Data'}
+    </span>
+  )}
+  {item.fallbackData && (
+    <span className="text-xs text-gray-500">(Fallback)</span>
+  )}
+  {item.auctionCount !== undefined && (
+    <span className="text-xs text-cyan-400">({item.auctionCount} auctions)</span>
+  )}
+</div>
                             </div>
                             <button className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-slate-900 font-bold rounded-lg text-sm opacity-50 cursor-not-allowed">
                               Add to Watchlist (Soon)
