@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
+
+/* Custom WoW-style animations */
+@keyframes float-gold {
+  0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+  10%, 90% { opacity: 0.3; }
+  50% { transform: translateY(-10vh) rotate(180deg); }
+}
+
+.animate-float-gold {
+  animation: float-gold 12s ease-in-out infinite;
+}
+
+/* Quality colors for WoW items */
+.quality-poor { color: #9d9d9d; }
+.quality-common { color: #ffffff; }
+.quality-uncommon { color: #1eff00; }
+.quality-rare { color: #0070dd; }
+.quality-epic { color: #a335ee; }
+.quality-legendary { color: #ff8000; }
