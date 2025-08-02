@@ -50,34 +50,64 @@ async function getServerAuctions(serverSlug, token) {
       throw new Error(`Unknown server: ${serverSlug}`);
     }
 
-    // Get auction house data
-    const namespace = serverSlug.includes('eu') ? 'dynamic-classic1x-eu' : 'dynamic-classic1x-us';
-    const region = serverSlug.includes('eu') ? 'eu' : 'us';
+// Get server auction data
+async function getServerAuctions(serverSlug, token) {
+  try {
+    console.log(`\n=== DEBUG: Getting auctions for ${serverSlug} ===`);
     
-const auctionUrl = `https://${region}.api.blizzard.com/data/wow/connected-realm/${connectedRealmId}/auctions?namespace=${namespace}&locale=en_US&access_token=${token}`;
-console.log(`Fetching: ${auctionUrl}`);
+    // Anniversary realms connected realm IDs (these might be wrong)
+    const serverMapping = {
+      'nightslayer': '4395',
+      'dreamscythe': '4396', 
+      'doomhowl': '4397',
+      'thunderstrike': '4398',
+      'spineshatter': '4399',
+      'soulseeker': '4400',
+      'maladath': '4401'
+    };
 
-const auctionResponse = await fetch(auctionUrl);
-
-console.log(`Response status: ${auctionResponse.status}`);
-if (!auctionResponse.ok) {
-  const errorText = await auctionResponse.text();
-  console.log(`Error response: ${errorText}`);
-  throw new Error(`Auction API error: ${auctionResponse.status} - ${errorText}`);
-}
-
-    if (!auctionResponse.ok) {
-      throw new Error(`Auction API error: ${auctionResponse.status}`);
+    const connectedRealmId = serverMapping[serverSlug];
+    console.log(`Mapped ${serverSlug} to realm ID: ${connectedRealmId}`);
+    
+    if (!connectedRealmId) {
+      throw new Error(`Unknown server: ${serverSlug}`);
     }
 
-    const auctionData = await auctionResponse.json();
-    return auctionData.auctions || [];
+    // Try different namespaces - Anniversary realms might be different
+    const namespaces = [
+      'dynamic-classic1x-us',
+      'dynamic-classic-us', 
+      'dynamic-us',
+      'dynamic-anniversary-us'
+    ];
+    
+    const region = serverSlug.includes('eu') ? 'eu' : 'us';
+    console.log(`Using region: ${region}`);
+    
+    for (const namespace of namespaces) {
+      const auctionUrl = `https://${region}.api.blizzard.com/data/wow/connected-realm/${connectedRealmId}/auctions?namespace=${namespace}&locale=en_US&access_token=${token}`;
+      console.log(`Trying URL: ${auctionUrl}`);
+      
+      const auctionResponse = await fetch(auctionUrl);
+      console.log(`Response status: ${auctionResponse.status}`);
+      
+      if (auctionResponse.ok) {
+        const auctionData = await auctionResponse.json();
+        console.log(`SUCCESS! Got ${auctionData.auctions?.length || 0} auctions`);
+        return auctionData.auctions || [];
+      } else {
+        const errorText = await auctionResponse.text();
+        console.log(`Failed with namespace ${namespace}: ${auctionResponse.status} - ${errorText}`);
+      }
+    }
+    
+    throw new Error(`All namespaces failed for ${serverSlug}`);
+    
   } catch (error) {
-    console.error(`Server ${serverSlug} Error:`, error);
+    console.error(`Server ${serverSlug} Error:`, error.message);
     return [];
   }
 }
-
 // Calculate prices from auction data
 function calculateItemPrices(auctions, itemId, faction) {
   const itemAuctions = auctions.filter(auction => auction.item?.id === itemId);
