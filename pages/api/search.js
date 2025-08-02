@@ -54,9 +54,17 @@ async function getServerAuctions(serverSlug, token) {
     const namespace = serverSlug.includes('eu') ? 'dynamic-classic1x-eu' : 'dynamic-classic1x-us';
     const region = serverSlug.includes('eu') ? 'eu' : 'us';
     
-    const auctionResponse = await fetch(
-      `https://${region}.api.blizzard.com/data/wow/connected-realm/${connectedRealmId}/auctions?namespace=${namespace}&locale=en_US&access_token=${token}`
-    );
+const auctionUrl = `https://${region}.api.blizzard.com/data/wow/connected-realm/${connectedRealmId}/auctions?namespace=${namespace}&locale=en_US&access_token=${token}`;
+console.log(`Fetching: ${auctionUrl}`);
+
+const auctionResponse = await fetch(auctionUrl);
+
+console.log(`Response status: ${auctionResponse.status}`);
+if (!auctionResponse.ok) {
+  const errorText = await auctionResponse.text();
+  console.log(`Error response: ${errorText}`);
+  throw new Error(`Auction API error: ${auctionResponse.status} - ${errorText}`);
+}
 
     if (!auctionResponse.ok) {
       throw new Error(`Auction API error: ${auctionResponse.status}`);
