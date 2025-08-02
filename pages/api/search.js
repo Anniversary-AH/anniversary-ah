@@ -20,67 +20,41 @@ export default async function handler(req, res) {
       return res.json({ items: [], message: 'No items found' });
     }
 
-    // If server specified, get real auction data
-    if (server && server !== 'all') {
-      const results = [];
-      
-      for (const item of items.slice(0, 3)) { // Limit to 3 items for API performance
-        try {
-          const auctions = await getServerAuctions(server);
-          const itemAuctions = findItemInAuctions(auctions, item.id);
-          
-          // Calculate prices (alliance/horde/both)
-          const prices = calculatePrices(itemAuctions);
-          
-          results.push({
-            ...item,
-            prices: { [server]: prices },
-            auctionCount: itemAuctions.length
-          });
-        } catch (error) {
-          console.error(`Error fetching auctions for ${item.name}:`, error);
-          // Return item without auction data if API fails
-          results.push({
-            ...item,
-            prices: { [server]: { alliance: 0, horde: 0, error: 'API Error' } },
-            auctionCount: 0
-          });
-        }
+    // Add sample price data for now (until Blizzard API keys are added)
+    const samplePrices = {
+      'Black Lotus': {
+        dreamscythe: { alliance: 185, horde: 180 },
+        nightslayer: { alliance: 195, horde: 192 },
+        doomhowl: { alliance: 178, horde: 175 }
+      },
+      'Greater Fire Protection Potion': {
+        dreamscythe: { alliance: 8, horde: 7 },
+        nightslayer: { alliance: 12, horde: 11 },
+        doomhowl: { alliance: 9, horde: 8 }
+      },
+      'Elixir of the Mongoose': {
+        dreamscythe: { alliance: 15, horde: 14 },
+        nightslayer: { alliance: 18, horde: 17 },
+        doomhowl: { alliance: 16, horde: 15 }
       }
-      
-      return res.json({ items: results });
-    }
+    };
 
-    // Return items without auction data if no server specified
-    return res.json({ items });
+    // Add price data to items
+    const itemsWithPrices = items.map(item => ({
+      ...item,
+      prices: samplePrices[item.name] || {
+        dreamscythe: { alliance: 0, horde: 0, error: 'No data' },
+        nightslayer: { alliance: 0, horde: 0, error: 'No data' },
+        doomhowl: { alliance: 0, horde: 0, error: 'No data' }
+      },
+      auctionCount: Math.floor(Math.random() * 20) + 1, // Random sample count
+      fallbackData: true
+    }));
+
+    return res.json({ items: itemsWithPrices });
     
   } catch (error) {
     console.error('Search API Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
-}
-
-// Helper function to calculate prices from auction data
-function calculatePrices(auctions) {
-  if (!auctions || auctions.length === 0) {
-    return { alliance: 0, horde: 0, error: 'No auctions found' };
-  }
-
-  // Simple price calculation - find lowest buyout price
-  const validAuctions = auctions.filter(a => a.buyout && a.buyout > 0);
-  
-  if (validAuctions.length === 0) {
-    return { alliance: 0, horde: 0, error: 'No buyout prices' };
-  }
-
-  // Convert copper to gold and get minimum price
-  const lowestPrice = Math.min(...validAuctions.map(a => a.buyout)) / 10000;
-  
-  // For now, return same price for both factions
-  // TODO: Separate by faction when we have faction data
-  return {
-    alliance: Math.round(lowestPrice * 100) / 100,
-    horde: Math.round(lowestPrice * 100) / 100,
-    count: validAuctions.length
-  };
 }
