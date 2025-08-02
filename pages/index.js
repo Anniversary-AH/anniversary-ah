@@ -141,7 +141,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>AzerothAH - WoW Anniversary Realm AH Tracker</title>
+        <title> Classic Anniversary Realm AH Tracker</title>
         <meta name="description" content="Track WoW Classic Anniversary realm auction house prices and calculate crafting profits" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
