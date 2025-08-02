@@ -5,6 +5,7 @@ export default function Home() {
   const [currentTab, setCurrentTab] = useState('prices');
   const [searchItem, setSearchItem] = useState('');
   const [selectedServer, setSelectedServer] = useState('all');
+  const [selectedFaction, setSelectedFaction] = useState('both'); // NEW: Faction state
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -74,8 +75,8 @@ export default function Home() {
     setLoading(true);
     
     try {
-      // Try API first
-      const response = await fetch(`/api/search?q=${encodeURIComponent(searchItem)}&server=${selectedServer}`);
+      // Try API first - NOW INCLUDES FACTION
+      const response = await fetch(`/api/search?q=${encodeURIComponent(searchItem)}&server=${selectedServer}&faction=${selectedFaction}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -118,6 +119,23 @@ export default function Home() {
     setSearchItem(itemName);
     // Auto search after setting item
     setTimeout(() => searchItems(), 100);
+  };
+
+  // NEW: Function to display prices based on faction selection
+  const displayPrice = (prices) => {
+    if (prices.error) {
+      return <span className="text-red-400 text-sm">{prices.error}</span>;
+    }
+    
+    switch (selectedFaction) {
+      case 'alliance':
+        return `🔵 Alliance: ${prices.alliance}g`;
+      case 'horde':
+        return `🔴 Horde: ${prices.horde}g`;
+      case 'both':
+      default:
+        return `🔵 A: ${prices.alliance}g | 🔴 H: ${prices.horde}g`;
+    }
   };
 
   return (
@@ -200,8 +218,8 @@ export default function Home() {
                   ))}
                 </div>
 
-                {/* Search Form */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                {/* Search Form - NOW WITH FACTION SELECTOR */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   <div>
                     <label className="block text-yellow-400 font-semibold mb-2">Item Name</label>
                     <input
@@ -227,6 +245,18 @@ export default function Home() {
                     </select>
                   </div>
                   <div>
+                    <label className="block text-yellow-400 font-semibold mb-2">Faction</label>
+                    <select
+                      value={selectedFaction}
+                      onChange={(e) => setSelectedFaction(e.target.value)}
+                      className="w-full p-3 border border-white/20 rounded-lg bg-black/30 text-gray-200 focus:border-yellow-400 focus:outline-none"
+                    >
+                      <option value="both">Both Factions</option>
+                      <option value="alliance">🔵 Alliance</option>
+                      <option value="horde">🔴 Horde</option>
+                    </select>
+                  </div>
+                  <div>
                     <button
                       onClick={searchItems}
                       disabled={loading}
@@ -238,9 +268,16 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Results Section */}
+              {/* Results Section - UPDATED PRICE DISPLAY */}
               <div className="bg-white/5 border border-white/20 rounded-2xl p-6 backdrop-blur-md">
-                <h3 className="text-yellow-400 text-xl font-bold mb-4">📊 Price Results</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-yellow-400 text-xl font-bold">📊 Price Results</h3>
+                  {selectedFaction !== 'both' && (
+                    <div className="text-sm text-gray-400">
+                      Showing {selectedFaction === 'alliance' ? '🔵 Alliance' : '🔴 Horde'} prices only
+                    </div>
+                  )}
+                </div>
                 
                 {loading ? (
                   <div className="text-center py-12">
@@ -251,6 +288,9 @@ export default function Home() {
                   <div className="text-center py-12 text-gray-400">
                     <h4 className="text-lg mb-2">🔍 Search for items to see Anniversary realm prices</h4>
                     <p>Try clicking the quick search buttons above!</p>
+                    <div className="mt-4 text-sm">
+                      💡 <strong>Pro tip:</strong> Use the faction selector to see Alliance or Horde prices specifically
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -288,11 +328,7 @@ export default function Home() {
                               <div key={server} className="bg-black/20 p-3 rounded-lg text-center">
                                 <div className="text-cyan-400 font-bold mb-1">{servers[server] || server}</div>
                                 <div className="text-yellow-400 font-bold text-lg">
-                                  {prices.error ? (
-                                    <span className="text-red-400 text-sm">{prices.error}</span>
-                                  ) : (
-                                    `A: ${prices.alliance}g | H: ${prices.horde}g`
-                                  )}
+                                  {displayPrice(prices)}
                                 </div>
                                 {prices.count && (
                                   <div className="text-gray-400 text-xs">{prices.count} available</div>
@@ -322,6 +358,7 @@ export default function Home() {
                 <ul className="text-gray-400 mt-2 space-y-1 max-w-md mx-auto text-left">
                   <li>• Real-time profit calculations</li>
                   <li>• Cross-realm arbitrage opportunities</li>
+                  <li>• <strong>Faction-specific pricing</strong></li>
                   <li>• Classic recipe database</li>
                   <li>• TBC preparation tools</li>
                   <li>• Guild shopping lists</li>
@@ -347,6 +384,7 @@ export default function Home() {
                 <ul className="text-gray-400 mt-2 space-y-1 max-w-md mx-auto text-left">
                   <li>• Price change alerts</li>
                   <li>• Cross-realm price watching</li>
+                  <li>• <strong>Faction-specific alerts</strong></li>
                   <li>• Guild shared watchlists</li>
                   <li>• Email & Discord notifications</li>
                   <li>• Historical price tracking</li>
