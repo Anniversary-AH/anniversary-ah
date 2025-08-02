@@ -9,16 +9,13 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Anniversary realm servers
-  const servers = {
-    'dreamscythe': 'Dreamscythe (Normal)',
-    'nightslayer': 'Nightslayer (PvP)', 
-    'doomhowl': 'Doomhowl (Hardcore)',
-    'thunderstrike': 'Thunderstrike (EU Normal)',
-    'spineshatter': 'Spineshatter (EU PvP)',
-    'soulseeker': 'Soulseeker (EU Hardcore)',
-    'maladath': 'Maladath (Oceanic)'
-  };
+// Anniversary realm servers (UPDATE THIS IN YOUR INDEX.JS)
+const servers = {
+  'dreamscythe': 'Dreamscythe (Normal)',
+  'nightslayer': 'Nightslayer (PvP)', 
+  'doomhowl': 'Doomhowl (Hardcore)',
+  'maladath': 'Maladath (Oceanic)'
+};
 
   // Sample item data (fallback if API fails)
   const sampleItems = {
