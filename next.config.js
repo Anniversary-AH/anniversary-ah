@@ -4,8 +4,8 @@ const nextConfig = {
   images: {
     domains: ['wow.zamimg.com', 'render.worldofwarcraft.com'],
   },
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
+  experimental: {
+    appDir: false
   }
 }
 
